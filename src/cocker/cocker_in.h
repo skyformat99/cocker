@@ -61,6 +61,13 @@ struct CommandParameter
 	
 	char			*__srepo ;
 	char			*__match ;
+	
+	char			*__cmd ;
+	char			*__template_file ;
+	char			*__mapping_file ;
+	char			*__instance_file ;
+	char			*__src_file ;
+	char			*__dst_file ;
 } ;
 
 struct CockerEnvironment
@@ -111,6 +118,7 @@ int CreateContainer( struct CockerEnvironment *env , char *__image_id , char *__
 
 int DoShow_images( struct CockerEnvironment *env );
 int DoShow_containers( struct CockerEnvironment *env );
+int DoShow_container_root( struct CockerEnvironment *env );
 
 int DoAction_install_test( struct CockerEnvironment *env );
 
@@ -118,6 +126,10 @@ int DoAction_create( struct CockerEnvironment *env );
 int DoAction_destroy( struct CockerEnvironment *env );
 int DoAction_boot( struct CockerEnvironment *env );
 int DoAction_attach( struct CockerEnvironment *env );
+int DoAction_run( struct CockerEnvironment *env );
+int DoAction_rplfile( struct CockerEnvironment *env );
+int DoAction_putfile( struct CockerEnvironment *env );
+int DoAction_getfile( struct CockerEnvironment *env );
 int DoAction_shutdown( struct CockerEnvironment *env );
 int _DoAction_kill( struct CockerEnvironment *env , int signal_no );
 int DoAction_kill( struct CockerEnvironment *env );
@@ -156,6 +168,7 @@ echo "1" >/proc/sys/net/ipv4/ip_forward
 /* for test
 cocker -s images
 cocker -s containers
+cocker -s container_root
 
 cocker -a install_test -d --version "1.0.0"
 
@@ -170,14 +183,23 @@ cocker -a create -d -m test --host test --net BRIDGE --vip 166.88.0.2 --port-map
 cocker -a create -d -m test --host test --net BRIDGE --vip 166.88.0.2 --port-mapping 19527:9527 -c test -b -t -e "/bin/bash -l"
 cocker -a create -d -m "calvin=rhel-7.4-x86_64:1.0.0,calvin=rhel-7.4-gcc-x86_64" --host test --net BRIDGE --vip 166.88.0.2 --port-mapping "19527:9527,5142:5142" -c test
 cocker -a create -d -m "calvin=rhel-7.4-x86_64,calvin=rhel-7.4-sshd-x86_64" --host test --net BRIDGE --vip 166.88.0.2 --port-mapping "2222:22" -c test
+cocker -a boot -d -c test
 cocker -a boot -d -c test -t
 cocker -a boot -d --cpus 1 --cpu-quota 30% --mem-limit 100M -c test -t
 cocker -a boot -d -c test -t -e "/bin/bash -l"
 cocker -a attach -d -c test
+cocker -a run -d -c test --cmd "hostname"
 cocker -a shutdown -d -c test
 cocker -a destroy -d -c test
 cocker -a destroy -d -c test -h
 cocker -a destroy -d -f -c test
+
+printf "\${LEAF} ÎÒµÄÊ÷Ò¶\n" >map.txt
+cocker -a rplfile -d -c test --template-file "/root/tpl.txt" --mapping-file "map.txt" --instance-file "/root/ins.txt"
+cocker -a rplfile -d -c test --template-file "/root/tpl.txt" --mapping-file "map.txt"
+
+cocker -a putfile -c test --src-file "map.txt" --dst-file "/root/"
+cocker -a getfile -c test --src-file "/root/map.txt" --dst-file "./"
 
 cocker -a version -d -m test --version "1.0.1"
 cocker -a version -d -m "test:1.0.1" --version "1.0.2"
@@ -210,6 +232,7 @@ cocker -s ssearch --match test
 
 cocker -a spush -m calvin=rhel-7.4-x86_64:1.0.0 -d -f
 
+. cocker_container_root.sh test
 */
 
 /* for test
@@ -221,6 +244,21 @@ sudo cp ~/src/cocker/src/util/libcocker_util.so /var/cocker/images/test/rlayer/l
 ip netns del netnstest
 
 echo "let S=0 ; while [ 1 ] ; do let S++; done" >test.sh
+
+cp /home/calvin/src/cocker/src/cockerinit/cockerinit /var/cocker/images/calvin=rhel-7.4-x86_64/1.0.0/rlayer/usr/bin/cockerinit
+cocker -a boot -c G6
+cocker -a shutdown -c G6
+cocker -a run -c "G6" --cmd "nohup /usr/sbin/sshd -D &"
+
+
+cocker -a create -m "calvin=rhel-7.4-x86_64,calvin=sshd,calvin=G6" --host G6 --net BRIDGE --vip 166.88.0.2 --port-mapping "8600:8600,2222:222" -c "G6" -b -e "/root/bin/G6 -f /root/etc/G6.conf --no-daemon" -d
+cocker -a boot -c "G6"
+cocker -a attach -c "G6"
+cocker -a boot -c "G6" -e "/root/bin/G6 -f /root/etc/G6.conf --no-daemon"
+cocker -a shutdown -c G6
+cocker -a shutdown -c G6 -f
+cocker -a destroy -c G6
+cocker -a destroy -c G6 -h
 */
 
 #ifdef __cplusplus

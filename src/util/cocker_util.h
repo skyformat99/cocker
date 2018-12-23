@@ -29,6 +29,7 @@
 #include <termios.h>
 #include <sys/socket.h>
 #include <sys/un.h>
+#include <poll.h>
 #include "openssl/md5.h"
 #define __USE_GNU
 #include <sched.h>
@@ -36,6 +37,7 @@
 #include "list.h"
 
 #include "LOGC.h"
+#include "filerpl.h"
 
 int ptmname_r(int fd, char * buf, size_t buflen);
 int ptsname_r(int fd, char * buf, size_t buflen);

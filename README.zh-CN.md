@@ -45,11 +45,23 @@
         - [3.1.19. 从ssh镜像库下载镜像](#3119-从ssh镜像库下载镜像)
         - [3.1.20. 上传镜像到cocker自有镜像库](#3120-上传镜像到cocker自有镜像库)
         - [3.1.21. 从cocker自有镜像库下载镜像](#3121-从cocker自有镜像库下载镜像)
+        - [3.1.22. 在容器外执行容器内命令](#3122-在容器外执行容器内命令)
+        - [3.1.23. 替换容器内文件内容](#3123-替换容器内文件内容)
+        - [3.1.24. 复制容器外文件或目录到容器内](#3124-复制容器外文件或目录到容器内)
+        - [3.1.25. 复制容器内文件或目录到容器外](#3125-复制容器内文件或目录到容器外)
+        - [3.1.26. 得到容器根目录在容器外路径](#3126-得到容器根目录在容器外路径)
     - [3.2. 脚本](#32-脚本)
         - [3.2.1. 创建测试镜像根文件系统脚本](#321-创建测试镜像根文件系统脚本)
         - [3.2.2. 创建操作系统基础镜像脚本](#322-创建操作系统基础镜像脚本)
         - [3.2.3. 创建sshd镜像脚本](#323-创建sshd镜像脚本)
         - [3.2.4. 创建gcc镜像脚本](#324-创建gcc镜像脚本)
+        - [3.2.5. 设置容器根目录环境变量](#325-设置容器根目录环境变量)
+    - [3.3. 场景示例](#33-场景示例)
+        - [3.3.1. 交互式构建yum镜像](#331-交互式构建yum镜像)
+        - [3.3.2. 交互式构建sshd镜像](#332-交互式构建sshd镜像)
+        - [3.3.3. 交互式构建G6镜像](#333-交互式构建G6镜像)
+        - [3.3.4. 镜像配置实例化容器并启动](#334-镜像配置实例化容器并启动)
+        - [3.3.5. 单进程启动容器](#335-单进程启动容器)
 - [4. 最后](#4-最后)
     - [4.1. 关于cocker](#41-关于cocker)
     - [4.2. 关于作者](#42-关于作者)
@@ -60,7 +72,7 @@
 
 ## 1.1. cocker是什么
 
-`cocker`是我个人用C语言完全自研的容器引擎（对标`Docker`），主要解决如下工作场景中的痛点：
+`cocker`是我个人用C语言完全自研的容器引擎（对标`Docker`、`阿里Pouch`），主要解决如下工作场景中的痛点：
 
 * 原生支持多进程架构的容器使用模式，无须引入第三方组件。
 * 按虚拟主机方式管理容器，交互式构建镜像，写过复杂Dockerfile的人都深恶痛绝。
@@ -266,7 +278,7 @@ make[1]: 离开目录“/home/calvin/src/cocker/src”
 
 编译并安装到系统目录里
 
-注意：如果你在非root用户编译源码，前面加上`sodu -E`。
+注意：如果你在非root用户编译源码，前面加上`sudo -E`。
 
 ```
 # make -f makefile.Linux install
@@ -800,6 +812,94 @@ test                           1.0.0      2018-11-14T09:09:04 24 MB
 
 （待研发）
 
+### 3.1.22. 在容器外执行容器内命令
+
+使用`cocker`指令`-a run`在容器外执行容器内命令
+
+```
+# cocker -a run -c test --cmd "hostname"
+test
+#
+```
+
+注意：容器是必须运行中状态。
+
+### 3.1.23. 替换容器内文件内容
+
+使用`cocker`指令`-a rplfile`替换容器内文件内容
+
+```
+# cocker -a rplfile -c test --template-file "/root/tpl.txt" --mapping-file "map.txt" --instance-file "/root/ins.txt"
+OK
+#
+```
+
+`--template-file`和`--instance-file`分别为模板文件和实例化文件，按容器内路径，省略`--instance-file`将替换`--template-file`自己。
+
+`--mapping-file`为替换配置，按容器外路径。一条规则为一行：
+```
+(KEY) (VALUE)\n
+(KEY) (VAL UE)\n
+...\n
+```
+
+替换示例：
+
+`tpl.txt`
+```
+{ "leaf":"${LEAF}" }
+```
+
+`map.txt`
+```
+${LEAF} 我的树叶
+```
+
+替换后的`ins.txt`
+```
+{ "leaf":"我的树叶" }
+```
+
+此替换功能被广泛用于实例化容器内应用配置文件。
+
+注意：容器是必须运行中状态。
+
+### 3.1.24. 复制容器外文件或目录到容器内
+
+使用`cocker`指令`-a putfile`复制容器外文件或目录到容器内
+
+```
+# cocker -a putfile -c test --src-file "map.txt" --dst-file "/root/"
+OK
+#
+```
+
+注意：也可通过ssh等服务复制。
+
+### 3.1.25. 复制容器内文件或目录到容器外
+
+使用`cocker`指令`-a getfile`复制容器内文件或目录到容器外
+
+```
+# cocker -a getfile -c test --src-file "/root/map.txt" --dst-file "./"
+OK
+#
+```
+
+注意：也可通过ssh等服务复制。
+
+### 3.1.26. 得到容器根目录在容器外路径
+
+使用`cocker`指令`-s container_root`得到容器根目录在容器外路径
+
+```
+# cocker -s container_root -c test
+/var/cocker/containers/test/merged
+#
+```
+
+注意：外露容器根目录可能不太合适。
+
 ## 3.2. 脚本
 
 ### 3.2.1. 创建测试镜像根文件系统脚本
@@ -813,12 +913,25 @@ test                           1.0.0      2018-11-14T09:09:04 24 MB
 ### 3.2.2. 创建操作系统基础镜像脚本
 
 注意：必须可正常使用yum为前提。
+注意：如需增删软件可修改`supermin5 -v --prepare`后的软件列表。
 
 ```
 # cocker_create_image_rhel-7.4-x86_64.sh
+...
+# ls -l calvin=rhel-7.4-x86_64:1.0.0.cockerimage
+-rw-r--r--  1 root root 91781857 Nov 25 09:03 calvin=rhel-7.4-x86_64:1.0.0.cockerimage
 ```
 
-执行后输入名字和版本号，自动生成可导入的镜像打包文件，文件名格式为`(作者)=(calvin=rhel-7.4-x86_64):(版本号).cockerimage`
+执行后输入名字和版本号，自动生成可导入的镜像打包文件，文件名格式为`(作者)=(rhel-7.4-x86_64):(版本号).cockerimage`
+
+```
+# cocker -a import --image-file calvin=rhel-7.4-x86_64:1.0.0.cockerimage
+OK
+# cocker -s images
+image_id                       version    modify_datetime     size      
+--------------------------------------------------------------------
+calvin=rhel-7.4-x86_64         1.0.0      2018-11-25T09:03:48 228 MB
+```
 
 ### 3.2.3. 创建sshd镜像脚本
 
@@ -828,12 +941,318 @@ test                           1.0.0      2018-11-14T09:09:04 24 MB
 # cocker_create_image_rhel-7.4-sshd-x86_64.sh
 ```
 
+注意：后面章节通过交互式构建可达到更小更干净的镜像。
+
 ### 3.2.4. 创建gcc镜像脚本
 
 此为创建gcc镜像层镜像打包文件。
 
 ```
 # cocker_create_image_rhel-7.4-gcc-x86_64.sh
+```
+
+注意：后面章节通过交互式构建可达到更小更干净的镜像。
+
+### 3.2.5. 设置容器根目录环境变量
+
+```
+# . cocker_container_root.sh test
+$ echo $COCKER_CONTAINER_ROOT
+/var/cocker/containers/test/merged
+# ls -l $COCKER_CONTAINER_ROOT
+total 20
+drwxr-xr-x.   2 root root 4096 Nov 22 08:26 bin
+-rwxr-xr-x.   1 root root 2634 Nov 22 08:43 cocker.log
+-rwxr-xr-x.   1 root root 4848 Nov 22 08:46 cockerinit.log
+drwxr-xr-x.   1 root root   25 Nov 22 08:43 dev
+drwxr-xr-x.   1 root root    6 Nov 22 08:26 etc
+drwxr-xr-x.   2 root root    6 Nov 22 08:26 lib
+drwxr-xr-x.   2 root root 4096 Nov 22 08:26 lib64
+drwxr-xr-x.   3 root root   19 Nov 22 08:26 mnt
+dr-xr-xr-x. 197 root root    0 Nov 22 08:43 proc
+drwxr-xr-x.   1 root root   42 Nov 22 08:46 root
+drwxr-xr-x.   2 root root   61 Nov 22 08:26 sbin
+drwxr-xr-x.   2 root root    6 Nov 22 08:26 tmp
+drwxr-xr-x.   3 root root   19 Nov 22 08:26 usr
+drwxr-xr-x.   2 root root    6 Nov 22 08:26 var
+```
+
+注意：此脚本调用了指令`-s container_root`。
+注意：外露容器根目录可能不太合适。
+
+## 3.3. 场景示例
+
+### 3.3.1. 交互式构建yum镜像
+
+有了操作系统基础镜像后可以交互式构建其它镜像。大致过程为用基础镜像创建启动容器，在容器内交互式安装和部署，然后停止容器，最后转换容器为新镜像。
+
+```
+# cocker -a create -m "calvin=rhel-7.4-x86_64" --host yum --volume "/mnt/cdrom:/mnt/cdrom" -c "calvin=yum"
+OK
+# cocker -a boot -c "calvin=yum" -t
+[root@yum /root] 
+```
+
+在容器内配置好yum，在我的环境里这样配置
+
+```
+[root@yum /root] mkdir -p /etc/yum.repos.d
+[root@yum /root] vi /etc/yum.repos.d/cdrom.repo
+[cdrom]
+name=cdrom
+baseurl=file:///mnt/cdrom
+gpgcheck=0
+enable=1
+```
+
+```
+[root@yum /root] yum search sshd
+cdrom                                                                                                                                                                                                                 | 4.1 kB  00:00:00     
+(1/2): cdrom/group_gz                                                                                                                                                                                                 | 137 kB  00:00:00     
+(2/2): cdrom/primary_db                                                                                                                                                                                               | 4.0 MB  00:00:00     
+=============================================================================================================== Matched: sshd ===============================================================================================================
+openssh-server.x86_64 : An open source SSH server daemon
+```
+
+转换容器为yum镜像
+
+```
+[root@yum /etc/yum.repos.d] exit
+logout
+# cocker -a shutdown -c "calvin=yum"
+OK
+# cocker -s containers
+container_id         image                hostname   net        netns            size       status
+-----------------------------------------------------------------------------------------------------------
+calvin=yum           calvin=rhel-7.4-x86_64 yum        HOST                        24 MB      STOPED
+# cocker -a to_image --from-container "calvin=yum" --version "1.0.0" --to-image "calvin=yum"
+OK
+# cocker -s containers
+# cocker -s images
+image_id                       version    modify_datetime     size      
+--------------------------------------------------------------------
+calvin=rhel-7.4-x86_64         1.0.0      2018-11-25T09:55:25 271 MB
+calvin=yum                     1.0.0      2018-11-25T10:16:59 24 MB
+```
+
+### 3.3.2. 交互式构建sshd镜像
+
+注意：交互式构建sshd依赖yum。
+
+```
+# cocker -a create -m "calvin=rhel-7.4-x86_64,calvin=yum" --host sshd --volume "/mnt/cdrom:/mnt/cdrom" --net BRIDGE --vip 166.88.0.2 --port-mapping "2222:22" -c "calvin=sshd"
+OK
+# cocker -a boot -c "calvin=sshd" -t
+[root@sshd /root] 
+```
+
+在容器内配置好sshd，在我的环境里这样配置
+
+```
+[root@sshd /root] yum install -y openssh-server
+...
+[root@sshd /root] ssh-keygen -t rsa -f /etc/ssh/ssh_host_rsa_key
+...（一般全直接按回车）
+[root@sshd /root] ssh-keygen -t rsa -f /etc/ssh/ssh_host_ecdsa_key
+...（一般全直接按回车）
+[root@sshd /root] echo "root:root" | chpasswd
+...（如有卡住，按Ctrl+C结束）
+[root@sshd /root] nohup /usr/sbin/sshd -D &
+```
+
+另外开一屏连接sshd容器
+
+```
+# ssh root@166.88.0.2 -p 2222
+The authenticity of host '[166.88.0.2]:2222 ([166.88.0.2]:2222)' can't be established.
+RSA key fingerprint is SHA256:kSX5DU3MiwEy8dArBoAk00kbB7hBtRXl/Pm4n9jWjBY.
+RSA key fingerprint is MD5:27:5d:b6:5a:5a:b1:bc:eb:b9:82:98:58:40:7e:eb:45.
+Are you sure you want to continue connecting (yes/no)? yes
+Warning: Permanently added '[166.88.0.2]:2222' (RSA) to the list of known hosts.
+root@166.88.0.2's password: （root密码前面被重置成root了）
+Last login: Mon Nov 26 13:28:07 2018 from 192.168.6.7
+-bash-4.2# 
+```
+
+转换容器为sshd镜像
+
+```
+[root@sshd /root] exit
+logout
+# cocker -a shutdown -c "calvin=sshd"
+OK
+# cocker -s containers
+container_id         image                hostname   net        netns            size       status
+-----------------------------------------------------------------------------------------------------------
+calvin=yum           calvin=rhel-7.4-x86_64 yum        HOST                        24 MB      STOPED
+# cocker -a to_image --from-container "calvin=sshd" --version "1.0.0" --to-image "calvin=sshd"
+OK
+# cocker -s containers
+# cocker -s images
+image_id                       version    modify_datetime     size      
+--------------------------------------------------------------------
+calvin=rhel-7.4-x86_64         1.0.0      2018-11-25T09:55:25 271 MB
+calvin=yum                     1.0.0      2018-11-25T10:16:59 24 MB
+calvin=sshd                    1.0.0      2018-11-26T09:16:59 335 MB
+```
+
+### 3.3.3. 交互式构建G6镜像
+
+`G6`是本人以前独立自研的负载均衡器（源码托管地址 : [开源中国](https://gitee.com/calvinwilliams/G6)、[github](https://github.com/calvinwilliams/G6)），不少公司在使用，下面介绍交互式构建G6镜像。
+
+```
+# cocker -a create -m "calvin=rhel-7.4-x86_64,calvin=yum,calvin=sshd" --host G6 --volume "/mnt/cdrom:/mnt/cdrom" --net BRIDGE --vip 166.88.0.2 --port-mapping "8600:8600,2222:222" -c "calvin=G6"
+OK
+# cocker -a boot -c "calvin=G6" -t
+[root@G6 /root] 
+```
+
+在容器内配置好G6，在我的环境里这样配置
+
+```
+[root@G6 /root] yum install -y git
+[root@G6 /root] yum install -y make
+[root@G6 /root] yum install -y gcc
+...（这里仅作演示，所以把git、gcc都安装在一起了）
+[root@G6 /root] mkdir src && cd src
+[root@G6 /root/src] git clone https://gitee.com/calvinwillisms/G6 && cd G6
+[root@G6 /root/src/G6] cd src
+[root@G6 /root/src/G6/src] make -f makefile.Linux install
+...
+[root@G6 /root/src/G6/src] mkdir ~/etc/ && vi ~/etc/G6.conf
+admin_rule_id G 127.0.0.1:* - 127.0.0.1:8600 ;
+my_rule RR *:* - 0.0.0.0:222 > 166.88.0.2:22 ;
+[root@G6 /root/src/G6/src] cd ~
+[root@G6 /root] nohup /usr/sbin/sshd -D &
+[root@G6 /root] G6
+G6 v1.0.6 build Nov 26 2018 14:28:18
+TCP Bridge && Load-Balance Dispenser
+Copyright by calvin 2016
+USAGE : G6 -f (config_pathfilename) [ -t (forward_thread_size) ] [ -s (forward_session_size) ] [ --log-level (DEBUG|INFO|WARN|ERROR|FATAL) ] [ --log-filename (logfilename) ] [ --close-log ] [ --no-daemon ] [ --set-cpu-affinity ]
+[root@G6 /root] G6 -f ~/etc/G6.conf
+```
+
+另外开一屏连接G6容器
+
+```
+# ssh root@166.88.0.2 -p 2222
+root@166.88.0.2's password: （root密码前面被重置成root了）
+Last login: Mon Nov 26 13:28:07 2018 from 192.168.6.7
+-bash-4.2# 
+```
+
+转换容器为G6镜像
+
+```
+[root@G6 /root] ps -ef
+...
+[root@G6 /root] ps -ef | grep -v grep | grep "G6 -f" | awk '{if($3==1)print $2}' | xargs kill
+[root@G6 /root] ps -ef | grep -v grep | grep -w sshd | awk '{print $2}' | xargs kill
+[root@G6 /root] exit
+logout
+# cocker -a shutdown -c "calvin=G6"
+OK
+# cocker -s containers
+container_id         image                hostname   net        netns            size       status
+-----------------------------------------------------------------------------------------------------------
+calvin=G6            calvin=rhel-7.4-x86_64,calvin=yum,calvin=sshd G6         BRIDGE     nns2513F44178    373 MB     STOPED
+# cocker -a to_image --from-container "calvin=G6" --version "1.0.0" --to-image "calvin=G6"
+OK
+# cocker -s containers
+# cocker -s images
+image_id                       version    modify_datetime     size      
+--------------------------------------------------------------------
+calvin=rhel-7.4-x86_64         1.0.0      2018-11-25T09:55:25 271 MB
+calvin=yum                     1.0.0      2018-11-25T10:16:59 24 MB
+calvin=sshd                    1.0.0      2018-11-26T09:16:59 335 MB
+calvin=G6                      1.0.0      2018-11-26T10:01:48 373 MB
+```
+
+### 3.3.4. 镜像配置实例化容器并启动
+
+还是拿本人的`G6`做例子，把镜像`calvin=G6`转化为容器，把配置文件改成模板后再转化回镜像
+
+```
+# cocker -a to_container --from-image "calvin=G6" -m "calvin=rhel-7.4-x86_64" --host G6 --to-container "calvin=G6"
+OK
+# cocker -a boot -c "calvin=G6" -t
+[root@G6 /root] cd etc
+[root@G6 /root/etc] mv G6.conf G6.conf.tpl
+[root@G6 /root/etc] vi G6.conf.tpl
+admin_rule G 127.0.0.1:* - 127.0.0.1:${ADMIN_PORT} ;
+my_rule RR *:* - 0.0.0.0:${FORWARD_PORT} > ${DEST_IP}:${DEST_PORT} ;
+[root@G6 /root/etc] vi ../bin/sshd.start
+nohup /usr/sbin/sshd -D &
+[root@G6 /root/etc] chmod +x ../bin/sshd.start
+[root@G6 /root/etc] exit
+logout
+# cocker -a shutdown -c "calvin=G6"
+OK
+# cocker -a to_image --from-container "calvin=G6" --version "1.1.0" --to-image "calvin=G6"
+OK
+# cocker -s images
+image_id                       version    modify_datetime     size      
+--------------------------------------------------------------------
+calvin=rhel-7.4-x86_64         1.0.0      2018-11-27T08:00:07 273 MB
+calvin=yum                     1.0.0      2018-11-26T09:10:43 24 MB
+calvin=sshd                    1.0.0      2018-11-26T09:17:12 335 MB
+calvin=G6                      1.1.0      2018-11-27T08:03:33 373 MB
+```
+
+最后用镜像创建容器，配置实例化，启动服务
+
+```
+# cocker -a create -m "calvin=rhel-7.4-x86_64,calvin=sshd,calvin=G6" --host G6 --net BRIDGE --vip 166.88.0.2 --port-mapping "8600:8600,2222:222" -c "G6"
+OK
+# cocker -a boot -c "G6"
+OK
+# vi G6.conf.map
+${ADMIN_PORT}   8600
+${FORWARD_PORT} 222
+${DEST_IP}      166.88.0.2
+${DEST_PORT}    22
+# cocker -a rplfile -c "G6" --template-file "/root/etc/G6.conf.tpl" --mapping-file "G6.conf.map" --instance-file "/root/etc/G6.conf"
+OK
+# cocker -a run -c "G6" --cmd "cat /root/etc/G6.conf"
+admin_rule G 127.0.0.1:* - 127.0.0.1:8600 ;
+my_rule RR *:* - 0.0.0.0:222 > 166.88.0.2:22 ;
+# cocker -a run -c "G6" --cmd "nohup /usr/sbin/sshd -D"
+nohup: ignoring input and appending output to 'nohup.out'
+# cocker -a run -c "G6" --cmd "G6 -f /root/etc/G6.conf"
+OK
+```
+
+另外开一屏连接G6容器
+
+```
+# ssh root@166.88.0.2 -p 2222
+root@166.88.0.2's password: （root密码前面被重置成root了）
+Last login: Mon Nov 26 13:28:07 2018 from 192.168.6.7
+-bash-4.2# exit
+```
+
+用完后关闭服务，最后停止和销毁容器
+
+```
+# cocker -a run -c "G6" --cmd "ps -ef | grep -v grep | grep 'G6 -f' | awk '{if($3==1)print $2}' | xargs kill"
+# cocker -a run -c "G6" --cmd "ps -ef | grep -v grep | grep -w sshd | awk '{print $2}' | xargs kill"
+# cocker -a shutdown -c G6
+```
+
+### 3.3.5. 单进程启动容器
+
+拿前面的`G6`容器来演示像`Docker`那样单进程启动容器
+
+```
+# cocker -a create -m "calvin=rhel-7.4-x86_64,calvin=sshd,calvin=G6" --host G6 --net BRIDGE --vip 166.88.0.2 --port-mapping "8600:8600,2222:222" -c "G6" -b -e "/root/bin/G6 -f /root/etc/G6.conf --no-daemon" -d
+OK
+```
+
+用完后停止并销毁容器
+
+```
+# cocker -a destroy -c G6 -h
+OK
 ```
 
 # 4. 最后
